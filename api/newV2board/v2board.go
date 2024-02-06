@@ -153,7 +153,7 @@ func (c *APIClient) parseResponse(res *resty.Response, path string, err error) (
 // GetNodeInfo will pull NodeInfo Config from panel
 func (c *APIClient) GetNodeInfo() (nodeInfo *api.NodeInfo, err error) {
 	server := new(serverConfig)
-	path := "/api/v1/server/UniProxy/config"
+	path := "/api/x6/server/UniProxy/config"
 
 	res, err := c.client.R().
 		SetHeader("If-None-Match", c.eTags["node"]).
@@ -203,7 +203,7 @@ func (c *APIClient) GetNodeInfo() (nodeInfo *api.NodeInfo, err error) {
 // GetUserList will pull user form panel
 func (c *APIClient) GetUserList() (UserList *[]api.UserInfo, err error) {
 	var users []*user
-	path := "/api/v1/server/UniProxy/user"
+	path := "/api/x6/server/UniProxy/user"
 
 	switch c.NodeType {
 	case "V2ray", "Trojan", "Shadowsocks":
@@ -263,7 +263,7 @@ func (c *APIClient) GetUserList() (UserList *[]api.UserInfo, err error) {
 
 // ReportUserTraffic reports the user traffic
 func (c *APIClient) ReportUserTraffic(userTraffic *[]api.UserTraffic) error {
-	path := "/api/v1/server/UniProxy/push"
+	path := "/api/x6/server/UniProxy/push"
 
 	// json structure: {uid1: [u, d], uid2: [u, d], uid1: [u, d], uid3: [u, d]}
 	data := make(map[int][]int64, len(*userTraffic))
