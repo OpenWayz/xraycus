@@ -5,13 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"os"
 	"regexp"
 	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 
 	"github.com/bitly/go-simplejson"
 	"github.com/go-resty/resty/v2"
@@ -57,7 +58,7 @@ func New(apiConfig *api.Config) *APIClient {
 
 	var nodeType string
 
-	if apiConfig.NodeType =="V2ray" && apiConfig.EnableVless {
+	if apiConfig.NodeType == "V2ray" && apiConfig.EnableVless {
 		nodeType = "vless"
 	} else {
 		nodeType = strings.ToLower(apiConfig.NodeType)
@@ -183,7 +184,7 @@ func (c *APIClient) GetNodeInfo() (nodeInfo *api.NodeInfo, err error) {
 	c.resp.Store(server)
 
 	switch c.NodeType {
-	case "V2ray":
+	case "V2ray", "Vmess", "Vless":
 		nodeInfo, err = c.parseV2rayNodeResponse(server)
 	case "Trojan":
 		nodeInfo, err = c.parseTrojanNodeResponse(server)
@@ -206,7 +207,7 @@ func (c *APIClient) GetUserList() (UserList *[]api.UserInfo, err error) {
 	path := "/api/v1/server/UniProxy/user"
 
 	switch c.NodeType {
-	case "V2ray", "Trojan", "Shadowsocks":
+	case "V2ray", "Trojan", "Shadowsocks", "Vmess", "Vless":
 		break
 	default:
 		return nil, fmt.Errorf("unsupported node type: %s", c.NodeType)
@@ -363,12 +364,12 @@ func (c *APIClient) parseSSNodeResponse(s *serverConfig) (*api.NodeInfo, error) 
 // parseV2rayNodeResponse parse the response for the given nodeInfo format
 func (c *APIClient) parseV2rayNodeResponse(s *serverConfig) (*api.NodeInfo, error) {
 	var (
-		host      string
-		header    json.RawMessage
-		enableTLS bool
+		host          string
+		header        json.RawMessage
+		enableTLS     bool
 		enableREALITY bool
-		dest string
-		xVer uint64
+		dest          string
+		xVer          uint64
 	)
 
 	if s.VlessTlsSettings.Dest != "" {
@@ -383,11 +384,11 @@ func (c *APIClient) parseV2rayNodeResponse(s *serverConfig) (*api.NodeInfo, erro
 	}
 
 	realityConfig := api.REALITYConfig{
-		Dest:        dest + ":" + s.VlessTlsSettings.ServerPort,
+		Dest:             dest + ":" + s.VlessTlsSettings.ServerPort,
 		ProxyProtocolVer: xVer,
-		ServerNames: []string{s.VlessTlsSettings.Sni},
-		PrivateKey:  s.VlessTlsSettings.PrivateKey,
-		ShortIds:    []string{s.VlessTlsSettings.ShortId},
+		ServerNames:      []string{s.VlessTlsSettings.Sni},
+		PrivateKey:       s.VlessTlsSettings.PrivateKey,
+		ShortIds:         []string{s.VlessTlsSettings.ShortId},
 	}
 
 	if c.EnableVless {
@@ -411,6 +412,18 @@ func (c *APIClient) parseV2rayNodeResponse(s *serverConfig) (*api.NodeInfo, erro
 			} else {
 				header = httpHeader
 			}
+		}
+	case "httpupgrade", "splithttp":
+		if s.NetworkSettings.Headers != nil {
+			if httpHeaders, err := s.NetworkSettings.Headers.MarshalJSON(); err != nil {
+				return nil, err
+			} else {
+				b, _ := simplejson.NewJson(httpHeaders)
+				host = b.Get("Host").MustString()
+			}
+		}
+		if s.NetworkSettings.Host != "" {
+			host = s.NetworkSettings.Host
 		}
 	}
 
